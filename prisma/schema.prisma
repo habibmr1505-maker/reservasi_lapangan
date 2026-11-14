@@ -1,0 +1,118 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  KASIR
+}
+
+enum BookingStatus {
+  MENUNGGU_DP
+  TERKONFIRMASI
+  SEDANG_BERMAIN
+  SELESAI
+  DIBATALKAN
+}
+
+enum PaymentStatus {
+  BELUM_BAYAR
+  DP
+  LUNAS
+  REFUND
+}
+
+enum AddonType {
+  SEWA
+  JUAL
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(60)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  namaLengkap  String   @map("nama_lengkap") @db.VarChar(120)
+  role         Role     @default(KASIR)
+  aktif        Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  @@map("users")
+}
+
+model Court {
+  id                   Int       @id @default(autoincrement())
+  namaLapangan         String    @map("nama_lapangan") @db.VarChar(100)
+  jenisOlahraga        String    @map("jenis_olahraga") @db.VarChar(60)
+  tarifRegulerPerJam   Decimal   @map("tarif_reguler_per_jam") @db.Decimal(12, 2)
+  tarifMalamPerJam     Decimal   @map("tarif_malam_per_jam") @db.Decimal(12, 2)
+  statusAktif          Boolean   @default(true) @map("status_aktif")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  bookings             Booking[]
+  @@map("courts")
+}
+
+model Addon {
+  id          Int            @id @default(autoincrement())
+  namaItem    String         @map("nama_item") @db.VarChar(100)
+  tipe        AddonType      @default(SEWA)
+  hargaSatuan Decimal        @map("harga_satuan") @db.Decimal(12, 2)
+  stok        Int            @default(0)
+  aktif       Boolean        @default(true)
+  bookingItems BookingAddon[]
+  @@map("addons")
+}
+
+model Booking {
+  id                  Int             @id @default(autoincrement())
+  noBooking           String          @unique @map("no_booking") @db.VarChar(40)
+  namaPemesan         String          @map("nama_pemesan") @db.VarChar(120)
+  namaTim             String?         @map("nama_tim") @db.VarChar(120)
+  noHp                String          @map("no_hp") @db.VarChar(30)
+  courtId             Int             @map("court_id")
+  court               Court           @relation(fields: [courtId], references: [id])
+  tanggalMain         DateTime        @map("tanggal_main") @db.Date
+  jamMulai            String          @map("jam_mulai") @db.VarChar(5)
+  jamSelesai          String          @map("jam_selesai") @db.VarChar(5)
+  durasiJam           Decimal         @map("durasi_jam") @db.Decimal(5, 2)
+  totalSewaLapangan   Decimal         @map("total_sewa_lapangan") @db.Decimal(12, 2)
+  totalAddons         Decimal         @default(0) @map("total_addons") @db.Decimal(12, 2)
+  diskon              Decimal         @default(0) @db.Decimal(12, 2)
+  grandTotal          Decimal         @map("grand_total") @db.Decimal(12, 2)
+  uangDp              Decimal         @default(0) @map("uang_dp") @db.Decimal(12, 2)
+  sisaBayar           Decimal         @map("sisa_bayar") @db.Decimal(12, 2)
+  statusBayar         PaymentStatus   @default(BELUM_BAYAR) @map("status_bayar")
+  statusBooking       BookingStatus  @default(MENUNGGU_DP) @map("status_booking")
+  alasanPembatalan    String?         @map("alasan_pembatalan") @db.VarChar(255)
+  createdAt           DateTime        @default(now()) @map("created_at")
+  items               BookingAddon[]
+  payments            Payment[]
+  @@index([courtId, tanggalMain, jamMulai, jamSelesai])
+  @@map("bookings")
+}
+
+model BookingAddon {
+  id         Int      @id @default(autoincrement())
+  bookingId  Int      @map("booking_id")
+  addonId    Int      @map("addon_id")
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  addon      Addon    @relation(fields: [addonId], references: [id])
+  hargaSatuan Decimal @map("harga_satuan") @db.Decimal(12, 2)
+  kuantiti   Int
+  subtotal   Decimal  @db.Decimal(12, 2)
+  @@map("booking_addons")
+}
+
+model Payment {
+  id          Int      @id @default(autoincrement())
+  bookingId   Int      @map("booking_id")
+  booking     Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  jumlah      Decimal  @db.Decimal(12, 2)
+  metode      String   @db.VarChar(30)
+  catatan     String?  @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at")
+  @@map("payments")
+}
